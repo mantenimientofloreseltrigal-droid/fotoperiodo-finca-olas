@@ -203,10 +203,11 @@ function intentarLogin() {
   const pin    = Array.from(document.querySelectorAll('.pin-inp')).map(i=>i.value).join('');
   if (!nombre) { showErr('Escribe tu nombre'); return; }
   if (pin.length < 4) { showErr('Ingresa el PIN de 4 dígitos'); return; }
-  const cfg = CFG.pines[pin];
-  if (!cfg) { showErr('PIN incorrecto'); return; }
-  operario = nombre; rol = cfg.rol;
+  const rolPin = validarPin(pin);
+  if (!rolPin) { showErr('PIN incorrecto'); return; }
+  operario = nombre; rol = rolPin;
   window.currentOperario = nombre;
+  window.currentRol = rolPin;
   document.getElementById('u-initials').textContent =
     nombre.split(' ').map(w=>w[0].toUpperCase()).slice(0,2).join('');
   document.getElementById('u-name').textContent = nombre.split(' ')[0];
@@ -344,60 +345,97 @@ function abrirBloque(b) {
 }
 
 // ── GUIRNALDAS ────────────────────────────────
+// ── GUIRNALDAS — DISEÑO VISUAL BOMBILLOS ─────────────────────────────────────
+function crearBombillosHTML(estado, n=10) {
+  let html = '<div class="bombillos-wrap-v2"><div class="cable-h"></div><div class="bombillos-row '+estado+'">';
+  for(let i=0;i<n;i++){
+    html += '<div class="bombillo"><div class="b-sock"></div>';
+    html += '<div class="b-bulb"><div class="b-shine"></div><div class="b-fil"></div></div></div>';
+  }
+  html += '</div></div>';
+  return html;
+}
+
 function renderGuirnaldas(b) {
   const info  = BLOQUES[String(b)];
   const horos = calcHoros(b);
-  let html = '';
+
+  // Leyenda
+  let html = '<div class="leyenda-v2">';
+  html += '<div class="ley-item"><div class="ley-dot" style="background:#fdd835;box-shadow:0 0 4px #fdd835"></div>Encendida</div>';
+  html += '<div class="ley-item"><div class="ley-dot" style="background:#F59E0B"></div>Por vencer</div>';
+  html += '<div class="ley-item"><div class="ley-dot" style="background:#555"></div>Apagada</div>';
+  html += '<div class="ley-item"><div class="ley-dot" style="border:1.5px dashed #888;background:transparent"></div>Sin sembrar</div>';
+  html += '</div>';
 
   horos.forEach(h=>{
-    html += '<div class="nave-section">';
-    html += '<div class="nave-label">'+h.id+' · Naves '+h.nIni+'–'+h.nFin+
-      ' <span class="nave-horo">'+h.turno.inicio+'–'+h.turno.fin+'</span></div>';
-
     for(let n=h.nIni;n<=h.nFin;n++){
-      html += '<div style="background:#fff;border-radius:10px;padding:10px;margin-bottom:6px;border:1px solid var(--bo)">';
-      html += '<div style="font-size:11px;font-weight:700;color:var(--ts);margin-bottom:6px">Nave '+n+'</div>';
+      html += '<div class="nave-wrap">';
+      html += '<div class="nave-header">';
+      html += '<span class="nave-num">🏠 Nave '+n+'</span>';
+      html += '<span class="nave-horo">⏱ '+h.id+' · '+h.turno.inicio+'–'+h.turno.fin+'</span>';
+      html += '</div>';
 
       ['A','B'].forEach(lado=>{
-        html += '<div class="lado-lbl">Lado '+lado+'</div>';
-        html += '<div class="guirnaldas-grid">';
-        for(let g=1;g<=2;g++){
-          const k   = gKey(b,n,lado,g);
-          const gd  = guirnaldas[k];
-          const est = estadoGuirnalda(gd);
-          const col = colorEstado(est);
-          const cams = camasDeGuirnalda(n,g); // camas relativas de la nave
-          // Calcular camas absolutas del bloque
-          const camAbs = [(n-1)*4+(cams[0]), (n-1)*4+(cams[1])];
-          const dr  = gd?.fechaFin ? diasRest(gd.fechaFin) : null;
+        html += '<div class="lado-section">';
+        html += '<div class="lado-label">';
+        html += '<span class="lado-tag">Lado '+lado+'</span>';
+        html += '<div class="lado-line-v2"></div>';
+        html += '<span class="lado-count">2 guirnaldas</span>';
+        html += '</div>';
 
-          html += '<div class="guirnalda '+est+'" onclick="abrirGuirnalda(\''+k+'\','+b+','+n+',\''+lado+'\','+g+')">';
-          html += '<div class="g-header"><span class="g-id">G'+n+lado+g+'</span>';
-          html += '<div class="g-estado" style="background:'+col+'"></div></div>';
-          html += '<div class="g-camas">Camas '+camAbs[0]+'-'+camAbs[1]+'</div>';
+        for(let g=1;g<=2;g++){
+          const k    = gKey(b,n,lado,g);
+          const gd   = guirnaldas[k];
+          const est  = estadoGuirnalda(gd);
+          const camR = camasDeGuirnalda(n,g);
+          const c1   = (n-1)*4 + camR[0];
+          const c2   = (n-1)*4 + camR[1];
+          const dr   = gd?.fechaFin ? diasRest(gd.fechaFin) : null;
+
+          // Badge días
+          let badgeCls='dias-empty', badgeTxt='Sin sembrar';
+          if(est==='encendida'&&dr!==null){badgeCls='dias-ok';badgeTxt=dr+' noches';}
+          if(est==='por-vencer'&&dr!==null){badgeCls='dias-warn';badgeTxt='⚠ '+dr+' noches';}
+          if(est==='apagada-auto'){badgeCls='dias-off';badgeTxt='Ciclo completo';}
+
+          // Tag estado
+          let etCls='et-empty', etTxt='Sin sembrar';
+          if(est==='encendida'){etCls='et-on';etTxt='● Encendida';}
+          if(est==='por-vencer'){etCls='et-warn';etTxt='⚠ Por vencer';}
+          if(est==='apagada-auto'){etCls='et-off';etTxt='✕ Apagada';}
+          if(est==='sembrada-apagada'){etCls='et-warn';etTxt='Sembrada';}
+
+          html += '<div class="guirnalda-card '+est+'" onclick="abrirGuirnalda(\''+ k+'\','+b+','+n+',\''+lado+'\','+g+')">';
+          html += '<span class="estado-tag '+etCls+'">'+etTxt+'</span>';
+          html += '<div class="camas-title-v2">';
+          html += '<span class="camas-num-v2">Camas '+c1+' — '+c2+'</span>';
+          html += '<span class="camas-side-v2">Lado '+lado+'</span>';
+          html += '</div>';
+          html += '<div class="camas-nave-v2">Nave '+n+' · '+h.id+'</div>';
+          html += crearBombillosHTML(est);
+
           if(gd?.variedad1){
-            html += '<div class="g-variedad">'+gd.variedad1+'</div>';
-            if(gd.variedad2 && gd.variedad2!==gd.variedad1)
-              html += '<div class="g-variedad" style="font-size:8px;color:var(--ts)">+'+gd.variedad2+'</div>';
-            html += '<div class="g-noches">'+gd.noches+' noches</div>';
-            if(dr!==null){
-              const col2=dr<0?'var(--r)':dr<=3?'var(--n)':'var(--vm)';
-              html += '<div class="g-dias" style="color:'+col2+'">'+(dr<0?'Venció':'Faltan '+dr+'d')+'</div>';
-            }
+            const v2 = gd.variedad2 && gd.variedad2!==gd.variedad1 ? ' / '+gd.variedad2 : '';
+            html += '<div class="info-row-v2">';
+            html += '<div><div class="variedad-name-v2">🌸 '+gd.variedad1+v2+'</div>';
+            html += '<div class="variedad-sub-v2">'+gd.noches+' noches';
+            if(gd.fechaIni) html += ' · desde '+fmtF(gd.fechaIni);
+            html += '</div></div>';
+            html += '<div class="dias-badge '+badgeCls+'">'+badgeTxt+'</div>';
+            html += '</div>';
           } else {
-            html += '<div class="g-variedad" style="color:#ccc;font-size:9px">Sin sembrar</div>';
+            html += '<div class="sembrar-hint-v2">🌱 Toca para registrar siembra</div>';
           }
           html += '</div>';
         }
-        html += '</div>';
+        html += '</div>'; // lado-section
       });
-      html += '</div>';
+      html += '</div>'; // nave-wrap
     }
-    html += '</div>';
   });
 
-  document.getElementById('dv-guirnaldas').innerHTML = html ||
-    '<div class="empty">Sin guirnaldas configuradas</div>';
+  document.getElementById('dv-guirnaldas').innerHTML = html || '<div class="empty">Sin guirnaldas configuradas</div>';
 }
 
 // ── MODAL GUIRNALDA ───────────────────────────
@@ -772,11 +810,31 @@ function switchDT(id,el){
   el.classList.add('sel');
   document.getElementById('dv-'+id).classList.add('show');
   if(id==='hist') renderHistBloque(bloqueAct);
+  if(id==='radio') renderRadioBloque(bloqueAct);
 }
 function volver(){showScreen('sc-inicio');setNavSel('nb-bloques');}
 function irBloques(){showScreen('sc-inicio');setNavSel('nb-bloques');}
 function irAlertas(){showScreen('sc-alertas');renderAlertas();setNavSel('nb-alertas');}
 function irPlan(){showScreen('sc-plan-global');renderPlanGlobal();setNavSel('nb-plan');}
+function irDashboard(){
+  if(!tienePermiso('ver_dashboard_gerencial')&&!tienePermiso('ver_dashboard_basico')){
+    alert('Sin permiso para ver el dashboard.');return;
+  }
+  showScreen('sc-dashboard');
+  renderDashboard();
+  setNavSel('nb-dash');
+}
+function irConfig(){
+  if(!tienePermiso('cambiar_pines')){alert('Solo el supervisor puede acceder a configuración.');return;}
+  showScreen('sc-config');
+  renderConfig();
+  setNavSel('nb-config');
+}
+function irRadiometria(){
+  showScreen('sc-radio-global');
+  renderRadioGlobal();
+  setNavSel('nb-radio');
+}
 
 function renderPlanGlobal(){
   const sem=semanaCorta();
@@ -802,7 +860,90 @@ if('serviceWorker' in navigator){
 }
 
 // ── INIT ──────────────────────────────────────
+function renderConfig() {
+  const wrap = document.getElementById('config-content');
+  let html = '';
+
+  // Cambiar PINes
+  html += '<div class="sec-lbl">Gestión de PINes</div>';
+  html += '<div class="card" style="margin-bottom:10px">';
+  Object.entries(PINES_CONFIG).forEach(([pin, r]) => {
+    const rol_info = ROLES[r];
+    html += `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--bo)">
+      <div>
+        <div style="font-size:12px;font-weight:700;color:${rol_info?.color||'#888'}">${rol_info?.label||r}</div>
+        <div style="font-size:11px;color:var(--ts)">PIN actual: ${pin}</div>
+      </div>
+      <input type="tel" maxlength="4" inputmode="numeric" placeholder="Nuevo PIN"
+        id="pin-new-${pin}" style="width:80px;padding:8px;border:1.5px solid var(--bo);border-radius:8px;text-align:center;font-size:14px;font-weight:700">
+    </div>`;
+  });
+  html += `<button class="btn-g" style="margin-top:10px" onclick="guardarPinesNuevos()">Guardar PINes</button>`;
+  html += `<div class="msg" id="msg-pines"></div>`;
+  html += '</div>';
+
+  // URL de Sheets
+  html += '<div class="sec-lbl">Google Sheets</div>';
+  html += '<div class="card" style="margin-bottom:10px">';
+  html += `<div class="field"><label>URL del Apps Script</label>
+    <input type="url" id="cfg-sheets-url" value="${SHEETS_URL||''}" placeholder="https://script.google.com/macros/s/...">
+  </div>`;
+  html += `<div class="banner bb" style="margin-bottom:10px"><span>ℹ️</span><span>Crea un Apps Script en tu Google Sheet y pega la URL aquí para sincronizar registros automáticamente.</span></div>`;
+  html += `<button class="btn-g" onclick="guardarConfigSheets()">Guardar URL</button>`;
+  html += `<div class="msg" id="msg-sheets-cfg"></div>`;
+  html += '</div>';
+
+  wrap.innerHTML = html;
+}
+
+async function guardarPinesNuevos() {
+  const msg = document.getElementById('msg-pines');
+  const nuevos = {};
+  let ok = true;
+  Object.entries(PINES_CONFIG).forEach(([pinViejo, r]) => {
+    const inp = document.getElementById('pin-new-'+pinViejo);
+    const val = inp?.value?.trim();
+    if (val && val.length === 4 && /^\d{4}$/.test(val)) {
+      nuevos[val] = r;
+    } else if (!val) {
+      nuevos[pinViejo] = r; // mantener el viejo
+    } else {
+      ok = false;
+    }
+  });
+  if (!ok) { msg.textContent='Los PINes deben ser de 4 dígitos.'; msg.className='msg err'; msg.style.display='block'; return; }
+  Object.assign(PINES_CONFIG, nuevos);
+  await guardarPines();
+  msg.textContent='✓ PINes actualizados correctamente.'; msg.className='msg ok'; msg.style.display='block';
+}
+
+async function guardarConfigSheets() {
+  const url = document.getElementById('cfg-sheets-url')?.value?.trim();
+  const msg = document.getElementById('msg-sheets-cfg');
+  if (!url) { msg.textContent='Ingresa la URL.'; msg.className='msg err'; msg.style.display='block'; return; }
+  await guardarSheetsURL(url);
+  msg.textContent='✓ URL guardada.'; msg.className='msg ok'; msg.style.display='block';
+}
+
+// ── MODO DÍA / NOCHE ─────────────────────────────────────────────────────────
+let modoNoche = true;
+function toggleModo() {
+  modoNoche = !modoNoche;
+  document.body.className = modoNoche ? 'noche' : 'dia';
+  document.getElementById('modo-ico').textContent = modoNoche ? '☀️' : '🌙';
+  document.getElementById('modo-lbl').textContent = modoNoche ? 'Día' : 'Noche';
+  localStorage.setItem('ftp_modo', modoNoche ? 'noche' : 'dia');
+}
+function cargarModo() {
+  const m = localStorage.getItem('ftp_modo') || 'noche';
+  modoNoche = m === 'noche';
+  document.body.className = m;
+  document.getElementById('modo-ico').textContent = modoNoche ? '☀️' : '🌙';
+  document.getElementById('modo-lbl').textContent = modoNoche ? 'Día' : 'Noche';
+}
+
 async function init(){
+  cargarModo();
   await cargarDatos();
   await cargarNochesCustom();
   initLogin();
