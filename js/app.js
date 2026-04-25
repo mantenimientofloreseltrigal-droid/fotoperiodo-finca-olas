@@ -227,6 +227,40 @@ function showErr(msg) {
   el.textContent = msg; el.style.display='block';
   setTimeout(()=>el.style.display='none', 3000);
 }
+function confirmarSalir() {
+  // Mostrar modal de confirmación
+  const html = `<div class="modal-handle"></div>
+    <div class="modal-title" style="color:var(--r)">⏻ Salir de la app</div>
+    <div style="font-size:13px;color:var(--txt2);margin-bottom:20px;line-height:1.6">
+      ¿Estás seguro que deseas salir?<br>
+      Los datos no sincronizados se guardan localmente y se enviarán cuando haya WiFi.
+    </div>
+    <button class="btn-g" style="background:var(--r);margin-bottom:8px" onclick="ejecutarSalir()">
+      Sí, salir
+    </button>
+    <button class="btn-outline" onclick="cerrarModal()">Cancelar</button>`;
+  document.getElementById('modal-body').innerHTML = html;
+  document.getElementById('modal-overlay').classList.add('show');
+}
+
+function ejecutarSalir() {
+  cerrarModal();
+  // Limpiar estado
+  operario = ''; rol = '';
+  window.currentOperario = '';
+  window.currentRol = '';
+  stopGPS();
+  // Volver al login
+  document.getElementById('app-shell').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('lc-nombre').value = '';
+  document.querySelectorAll('.pin-inp').forEach(i => i.value = '');
+  document.getElementById('lc-err').style.display = 'none';
+  // Reset nav
+  setNavSel('nb-bloques');
+  showScreen('sc-inicio');
+}
+
 function cerrarSesion() {
   if (!confirm('¿Cerrar sesión?')) return;
   stopGPS();
@@ -587,26 +621,51 @@ async function registrarSiembra(k, bl, nave, lado, g) {
 function renderHoros(b) {
   const horos = calcHoros(b);
   let html = '';
+  let algunoActivo = false;
   horos.forEach(h=>{
     const key = b+'_'+h.id;
     const lect = lecturas[key] || {};
     const diff = lect.hoy>0 && lect.ayer>=0 ? parseFloat((lect.hoy-lect.ayer).toFixed(2)) : null;
     const esAl = diff!==null && diff<CFG.horoMinimo;
     const esAv = diff!==null && !esAl && diff<CFG.horoMinimo*1.3;
-    const cls  = diff===null?'':esAl?'alerta':esAv?'aviso':'ok';
     const col  = diff===null?'var(--ts)':esAl?'var(--r)':esAv?'var(--n)':'var(--vm)';
     const dcls = diff===null?'':esAl?'d-al':esAv?'d-av':'d-ok';
 
     // Contar guirnaldas encendidas en este horómetro
-    let gEnc=0;
+    let gEnc=0, gVence=0;
     for(let n=h.nIni;n<=h.nFin;n++){
       ['A','B'].forEach(lado=>{
         for(let g=1;g<=2;g++){
-          if(estadoGuirnalda(guirnaldas[gKey(b,n,lado,g)])==='encendida') gEnc++;
+          const est=estadoGuirnalda(guirnaldas[gKey(b,n,lado,g)]);
+          if(est==='encendida') gEnc++;
+          if(est==='por-vencer') gVence++;
         }
       });
     }
 
+    // ── HORÓMETRO INACTIVO (sin guirnaldas encendidas) ──
+    if(gEnc===0 && gVence===0){
+      html += `<div class="card" style="opacity:.45;border-style:dashed">
+        <div class="card-top">
+          <div>
+            <div class="card-name" style="color:var(--ts)">${h.id}</div>
+            <div class="card-sub">Naves ${h.nIni}–${h.nFin} · Sin guirnaldas activas</div>
+          </div>
+          <span class="badge b-gr">Inactivo</span>
+        </div>
+        <div class="turno-chip">
+          <span class="tc-k">Turno</span><span class="tc-v">${h.turno.inicio}–${h.turno.fin}</span>
+          <span class="tc-k">Estado</span><span class="tc-v" style="color:var(--ts)">Sin camas en luces</span>
+        </div>
+        <div style="text-align:center;padding:10px;font-size:12px;color:var(--ts)">
+          ⚫ Este horómetro no tiene guirnaldas encendidas.<br>No requiere lectura.
+        </div>
+      </div>`;
+      return;
+    }
+
+    algunoActivo = true;
+    const cls = diff===null?'':esAl?'alerta':esAv?'aviso':'ok';
     html += '<div class="card '+cls+'">';
     html += '<div class="card-top"><div><div class="card-name">'+h.id+'</div>';
     html += '<div class="card-sub">Naves '+h.nIni+'–'+h.nFin+' · '+gEnc+' guirnaldas encendidas</div></div>';
@@ -628,8 +687,14 @@ function renderHoros(b) {
     html += '<button class="btn-g" onclick="guardarHoro('+b+',\''+h.id+'\')">Guardar lectura</button>';
     html += '<div class="msg" id="msg-'+b+'-'+h.id+'"></div></div>';
   });
+  if(!algunoActivo && html.length > 0) {
+    html = `<div class="banner bw" style="border-radius:10px;margin-bottom:10px">
+      <span>⚠</span>
+      <span>Ningún horómetro tiene guirnaldas encendidas en este bloque. Registra siembras primero.</span>
+    </div>` + html;
+  }
   document.getElementById('dv-horometros').innerHTML = html ||
-    '<div class="empty">Sin horómetros</div>';
+    '<div class="empty">Sin horómetros configurados</div>';
 }
 
 async function guardarHoro(b, hid) {

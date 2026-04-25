@@ -351,3 +351,7 @@ body.dia   .nav-btn.sel{color:var(--v)}
 .leyenda-v2{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
 .ley-item{display:flex;align-items:center;gap:4px;font-size:10px;color:var(--txt2)}
 .ley-dot{width:9px;height:9px;border-radius:50%}
+
+/* BOTÓN SALIR */
+#nb-salir{color:#E24B4A!important}
+#nb-salir:active{opacity:.7}
