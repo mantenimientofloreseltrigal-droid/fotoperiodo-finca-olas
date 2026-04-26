@@ -1,0 +1,23 @@
+{
+  "name": "Fotoperiodo v2 \u2014 Finca Olas",
+  "short_name": "Fotoperiodo",
+  "description": "Control de siembras y guirnaldas - Finca Olas",
+  "start_url": "/fotoperiodo-finca-olas/index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0F6E56",
+  "theme_color": "#0F6E56",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "scope": "/fotoperiodo-finca-olas/"
+}
