@@ -7,7 +7,7 @@ let SHEETS_URL = '';
 
 // URL configurada directamente en el código — no editable desde la app
 // Para cambiarla editar este archivo y redesplegar en GitHub
-const SHEETS_URL_FIJA = ''; // ← PEGA AQUÍ LA URL DEL APPS SCRIPT
+const SHEETS_URL_FIJA = 'https://script.google.com/macros/s/AKfycbyQ-sZsmehwJJfgJc9VFIvNj6JAJOi0ni9gHtsWhBKbC4yoeGP0BvpOSZgTl4-jkptw/exec'; // ← PEGA AQUÍ LA URL DEL APPS SCRIPT
 
 async function cargarSheetsURL() {
   // Prioridad: URL fija en código > URL guardada localmente
